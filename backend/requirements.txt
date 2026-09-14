@@ -1,0 +1,43 @@
+# Requires Python 3.12.
+#   uv venv --python 3.12 && uv pip install -r requirements.txt
+
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pydantic==2.10.4
+pydantic-settings==2.7.1
+email-validator==2.2.0
+sqlalchemy==2.0.36
+pyjwt==2.10.1
+bcrypt==4.2.1
+python-dotenv==1.0.1
+
+# --- RAG stack ---
+#
+# pypdf, not PyMuPDF. PyMuPDF binds MuPDF, a full rendering engine: it can
+# rasterize pages, and it carries a large native library resident in the process
+# for the whole run. We only ever called get_text(). pypdf is pure Python, reads
+# one page object at a time, and never allocates a pixmap. Text quality on
+# two-column layouts is slightly worse -- that is the cost, and it is stated in
+# the README rather than hidden.
+pypdf==5.1.0
+
+# numpy does the vector search. There is no vector database in this process any
+# more: chromadb kept an HNSW index and a Rust core resident, which is a large
+# fixed cost to search a few hundred vectors per paper. Embeddings are stored as
+# float32 blobs in SQLite and cosine similarity is one np.dot over one paper's
+# matrix -- under a millisecond, and nothing stays resident between requests.
+numpy==2.2.1
+
+rank-bm25==0.2.2
+# google-genai, not google-generativeai. The old SDK is deprecated and spoke
+# gRPC; measured in-process the swap saved ~13 MB of resident floor and removed
+# the gRPC core entirely. See app/rag/llm.py.
+google-genai==2.23.0
+
+# Reports current RSS for /debug/memory. Small, no native build on linux/win.
+psutil==6.1.1
+
+# Dev
+pytest==8.3.4
+httpx==0.28.1   # also used at runtime: arXiv/DOI fetch, OpenAlex lookups

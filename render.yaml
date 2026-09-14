@@ -1,0 +1,130 @@
+# Render blueprint. Create the service from this file rather than clicking
+# through the dashboard, so the deployment is reviewable in git.
+#
+#   Render dashboard -> New -> Blueprint -> point it at this repo
+#
+# Every value that must be set by hand is marked `sync: false`, which makes
+# Render prompt for it at create time instead of silently deploying without it.
+
+services:
+  - type: web
+    name: paperlens
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    # Build context is the repo root: the Dockerfile copies from both
+    # frontend/ and backend/ to produce the single-container image.
+    dockerContext: .
+
+    # Render restarts the instance if this stops answering. It is a static
+    # handler that touches no dependency -- see the note on the endpoint itself.
+    healthCheckPath: /api/health
+
+    envVars:
+      # --- Concurrency, and why these exact numbers -------------------------
+      #
+      # This is the setting that actually keeps the memory budget honest. A
+      # single request's peak is small by construction (the ingest pipeline
+      # streams); what would blow 512 MB is forty of them at once.
+      #
+      # WEB_CONCURRENCY=1: one uvicorn worker process. Each additional worker is
+      # a full copy of the interpreter, FastAPI, SQLAlchemy, NumPy and the gRPC
+      # client -- about 140 MB of fixed floor duplicated for no benefit here,
+      # since this workload is almost entirely waiting on a network call.
+      #
+      # THREAD_LIMIT=2: Starlette runs every `def` endpoint on an anyio
+      # threadpool that defaults to **40** threads. Forty concurrent requests
+      # each holding an embedding batch and a BM25 index is the realistic OOM
+      # path. Two is enough to keep a background ingest running while a chat
+      # request is served, and it bounds the worst case at two working sets.
+      #
+      # Both are read in app/main.py and passed to uvicorn by the start command.
+      - key: WEB_CONCURRENCY
+        value: 1
+      - key: THREAD_LIMIT
+        value: 2
+
+      # --- Secrets ----------------------------------------------------------
+      - key: GEMINI_API_KEY
+        sync: false          # get one free at https://aistudio.google.com/apikey
+      - key: SECRET_KEY
+        generateValue: true  # Render generates a random value and keeps it stable
+
+      # --- Behaviour --------------------------------------------------------
+      # DEBUG=false is what arms the SECRET_KEY guard in app/config.py. Without
+      # it the service would boot signing JWTs with the placeholder committed to
+      # a public repo.
+      - key: DEBUG
+        value: "false"
+
+      # Pinned, not an alias. An alias would silently change the model under a
+      # running deployment, and the README's numbers would stop meaning anything.
+      - key: GEMINI_MODEL
+        value: gemini-3.1-flash-lite
+      - key: EMBEDDING_MODEL
+        value: models/gemini-embedding-001
+      - key: EMBEDDING_DIM
+        value: "768"
+
+      # --- Storage ----------------------------------------------------------
+      #
+      # The free plan has no persistent disk, so everything here lives on the
+      # container's ephemeral filesystem and is wiped on every deploy and on
+      # every cold start after the instance sleeps.
+      #
+      # This is a deliberate choice, not an oversight. The alternative is
+      # Render's free Postgres, which **expires 30 days after creation** -- for
+      # a portfolio project that has to still work at an interview six months
+      # from now, a database that deletes itself is worse than one that resets.
+      # The app treats the loss as non-fatal: tables are recreated on boot, and
+      # the UI says plainly that uploads do not survive a restart.
+      #
+      # To make it durable: create a Render Postgres instance and set
+      # DATABASE_URL to its internal connection string. Nothing else changes --
+      # every query goes through SQLAlchemy. Uploaded PDFs would still need a
+      # disk or object store; re-uploading re-ingests them.
+      - key: DATABASE_URL
+        value: sqlite:////home/user/storage/paperlens.db
+      - key: UPLOAD_DIR
+        value: /home/user/storage/uploads
+      - key: MAX_UPLOAD_MB
+        value: "25"
+      - key: MAX_PAGES
+        value: "400"
+      # Model-based OCR for scanned PDFs costs one call per page; off on the
+      # free key. Flip to "true" with a paid key.
+      - key: SCANNED_PDF_OCR
+        value: "false"
+
+      # --- Abuse limits ------------------------------------------------------
+      # One free Gemini key serves every visitor. In-memory per-user buckets
+      # (correct with WEB_CONCURRENCY=1) keep one visitor from draining it.
+      - key: RATE_LIMITING
+        value: "true"
+      - key: RATE_CHAT_PER_MINUTE
+        value: "12"
+      - key: RATE_INGEST_PER_HOUR
+        value: "6"
+      - key: DAILY_CALLS_PER_USER
+        value: "300"
+
+      # --- Retrieval tuning -------------------------------------------------
+      - key: TOP_K
+        value: "10"
+      - key: CHUNK_TARGET_TOKENS
+        value: "1000"
+      - key: CHUNK_OVERLAP_TOKENS
+        value: "120"
+      - key: EMBED_BATCH_SIZE
+        value: "64"
+      - key: QUERY_VARIANTS
+        value: "3"
+      - key: CHAT_RECENT_TURNS
+        value: "6"
+
+      # Empty because the frontend is served from this same origin, so CORS
+      # never applies. Explicit rather than defaulted, so a stray value in the
+      # build environment cannot leak through.
+      - key: CORS_ORIGINS
+        value: ""

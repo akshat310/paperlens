@@ -1,0 +1,51 @@
+# Build context for the root (single-container) Dockerfile.
+#
+# The per-directory .dockerignore files in backend/ and frontend/ do NOT apply
+# to a build rooted here -- Docker only reads the one next to the build context.
+# Hence this file, which is not a duplicate of those.
+
+# Reinstalled inside the image by `npm ci` / `pip install`. Copying the host's
+# copies would be slow and could carry platform-specific binaries built for
+# Windows that do not run on Debian.
+node_modules/
+.venv/
+.venv312/
+venv/
+
+# Built by stage 1 of the Dockerfile. A stale host build would be copied in and
+# then overwritten -- pure context bloat, and confusing if the copy won.
+frontend/dist/
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Never bake real secrets into an image layer. Render injects them as
+# environment variables at run time; .env.example is committed and is fine.
+.env
+backend/.env
+frontend/.env
+
+# Local data: the SQLite file and uploaded PDFs. A fresh container creates
+# these on boot.
+backend/storage/
+
+# Generated evaluation artefacts; the scripts that produce them are included.
+backend/eval/fixture_paper.pdf
+backend/eval/results.md
+
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Notes, not application code.
+ANALYSIS.md
+
+# Local artefacts of the browser tests and the locally served bundle. The
+# image builds its own bundle in stage 1; a stale host copy is only bloat.
+backend/static/
+frontend/e2e/results/
+frontend/test-results/

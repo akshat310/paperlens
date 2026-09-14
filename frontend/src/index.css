@@ -1,0 +1,14 @@
+/* Tailwind v4 is configured from CSS, not a tailwind.config.js file.
+   This single import pulls in the reset and generates the utility classes
+   actually used in the components. */
+@import 'tailwindcss';
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
