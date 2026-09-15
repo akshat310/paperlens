@@ -7,18 +7,24 @@
 # Reinstalled inside the image by `npm ci` / `pip install`. Copying the host's
 # copies would be slow and could carry platform-specific binaries built for
 # Windows that do not run on Debian.
-node_modules/
-.venv/
-.venv312/
-venv/
+# `**/` is load-bearing: a bare `node_modules/` only matches at the context
+# root in Docker, and these live one level down. Render builds from a fresh
+# git checkout where they do not exist, but a local `docker build` would
+# otherwise copy a Windows node_modules over the image's Linux one.
+**/node_modules/
+**/.venv/
+**/.venv312/
+**/venv/
 
 # Built by stage 1 of the Dockerfile. A stale host build would be copied in and
 # then overwritten -- pure context bloat, and confusing if the copy won.
 frontend/dist/
+frontend/e2e/
+frontend/playwright.config.ts
 
-__pycache__/
+**/__pycache__/
 *.py[cod]
-.pytest_cache/
+**/.pytest_cache/
 
 # Never bake real secrets into an image layer. Render injects them as
 # environment variables at run time; .env.example is committed and is fine.
@@ -42,7 +48,9 @@ backend/eval/results.md
 Thumbs.db
 
 # Notes, not application code.
-ANALYSIS.md
+docs/
+PITCH.md
+RECOMMENDATIONS.md
 
 # Local artefacts of the browser tests and the locally served bundle. The
 # image builds its own bundle in stage 1; a stale host copy is only bloat.

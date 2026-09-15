@@ -347,11 +347,14 @@ GET    /api/debug/usage              → ledger totals  ?days=1
 
 ## Deployment
 
-Render, from `render.yaml`:
+Render, either way — full walkthrough in [DEPLOY.md](DEPLOY.md):
 
-1. Push to GitHub.
-2. Render → **New → Blueprint** → point at the repo.
-3. Set `GEMINI_API_KEY` when prompted. `SECRET_KEY` is generated automatically.
+- **New → Web Service**: runtime *Docker*, Dockerfile at `./Dockerfile`, free
+  instance, health check `/api/health`, and the environment variables listed
+  in DEPLOY.md (`GEMINI_API_KEY` and a generated `SECRET_KEY` are the two that
+  must be set by hand).
+- **New → Blueprint**: point it at the repo; `render.yaml` sets everything and
+  prompts only for `GEMINI_API_KEY`.
 
 `DEBUG=false` arms a guard in `app/config.py` that **refuses to boot** with the
 placeholder signing key.

@@ -4,7 +4,10 @@
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 python-multipart==0.0.20
-pydantic==2.10.4
+# 2.13, not 2.10: google-genai requires pydantic>=2.12.5. The Docker build
+# resolves this file from scratch, so a pin that only works because the dev
+# venv was upgraded in place would fail on Render.
+pydantic==2.13.5
 pydantic-settings==2.7.1
 email-validator==2.2.0
 sqlalchemy==2.0.36
